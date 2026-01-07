@@ -6,6 +6,8 @@
 
 **App-Locker-Pin-Pattern-Biometric** is a secure Android application developed with Kotlin and Jetpack Compose, designed to protect your sensitive apps with multiple authentication methods. It offers PIN, pattern, and biometric authentication (fingerprint/face) to unlock protected applications, ensuring privacy and security on your device. The app includes features like background service monitoring, comprehensive app locking, onboarding flow, and accessibility support to enhance user experience and device compatibility. Its modular architecture facilitates easy maintenance and scalability.
 
+
+ ## demo video : https://youtu.be/DiJNnu_a0s4
 ---
 
 ## ✨ Features
