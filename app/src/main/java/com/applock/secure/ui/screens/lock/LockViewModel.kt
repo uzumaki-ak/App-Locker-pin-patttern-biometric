@@ -12,10 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * ViewModel for Lock Screen
- * Handles authentication validation when unlocking apps
- */
 @HiltViewModel
 class LockViewModel @Inject constructor(
     private val validateAuthUseCase: ValidateAuthUseCase,
@@ -29,9 +25,6 @@ class LockViewModel @Inject constructor(
         loadAuthMethod()
     }
 
-    /**
-     * Load current authentication method
-     */
     private fun loadAuthMethod() {
         val authMethod = validateAuthUseCase.getAuthMethod()
         val biometricEnabled = securityRepository.isBiometricEnabled()
@@ -41,9 +34,6 @@ class LockViewModel @Inject constructor(
         )
     }
 
-    /**
-     * Validate PIN
-     */
     fun validatePin(pin: String) {
         viewModelScope.launch {
             val isValid = validateAuthUseCase.validatePin(pin)
@@ -61,9 +51,6 @@ class LockViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Validate Pattern
-     */
     fun validatePattern(pattern: String) {
         viewModelScope.launch {
             val isValid = validateAuthUseCase.validatePattern(pattern)
@@ -81,9 +68,6 @@ class LockViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Handle biometric success
-     */
     fun onBiometricSuccess() {
         _uiState.value = _uiState.value.copy(
             isUnlocked = true,
@@ -91,9 +75,6 @@ class LockViewModel @Inject constructor(
         )
     }
 
-    /**
-     * Handle biometric failure
-     */
     fun onBiometricFailure(error: String) {
         _uiState.value = _uiState.value.copy(
             error = error,
@@ -101,17 +82,45 @@ class LockViewModel @Inject constructor(
         )
     }
 
-    /**
-     * Clear error
-     */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
+
+    // Recovery methods
+    fun getSecurityQuestion(): String? {
+        return securityRepository.getSecurityQuestion()
+    }
+
+    fun hasRecoverySetup(): Boolean {
+        return securityRepository.hasSecurityQuestion() && securityRepository.hasRecoveryPin()
+    }
+
+    fun verifySecurityAnswer(answer: String): Boolean {
+        return securityRepository.verifySecurityAnswer(answer)
+    }
+
+    fun verifyRecoveryPin(pin: String): Boolean {
+        return securityRepository.verifyRecoveryPin(pin)
+    }
+
+    fun getAuthMethod(): AuthMethod {
+        return securityRepository.getAuthMethod()
+    }
+
+    fun resetPassword(newPassword: String) {
+        val authMethod = securityRepository.getAuthMethod()
+        when (authMethod) {
+            AuthMethod.PIN -> {
+                securityRepository.setupPin(newPassword)
+            }
+            AuthMethod.PATTERN -> {
+                securityRepository.setupPattern(newPassword)
+            }
+            else -> {}
+        }
+    }
 }
 
-/**
- * UI State for Lock Screen
- */
 data class LockUiState(
     val authMethod: AuthMethod = AuthMethod.NONE,
     val biometricEnabled: Boolean = false,

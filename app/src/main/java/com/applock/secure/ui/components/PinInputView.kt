@@ -1,38 +1,47 @@
 package com.applock.secure.ui.components
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.applock.secure.util.AppConstants
 
 /**
  * PIN Input Component
- * Custom PIN entry with dots for security
- * Auto-triggers callback when PIN is complete
+ * Shows dynamic dots based on PIN length (4-8 digits)
+ * Auto-submits when user stops typing
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PinInputView(
     onPinComplete: (String) -> Unit,
     onPinChange: (String) -> Unit = {}
 ) {
     var pin by remember { mutableStateOf("") }
+    var showSubmitButton by remember { mutableStateOf(false) }
+
+    // Show submit button after 1 second of no input
+    LaunchedEffect(pin) {
+        if (pin.length >= AppConstants.MIN_PIN_LENGTH) {
+            showSubmitButton = false
+            kotlinx.coroutines.delay(1000)
+            showSubmitButton = true
+        } else {
+            showSubmitButton = false
+        }
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // PIN display (dots)
+        // Dynamic PIN display (shows only entered digits)
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            repeat(AppConstants.MAX_PIN_LENGTH) { index ->
+            // Show dots for entered digits
+            repeat(maxOf(pin.length, AppConstants.MIN_PIN_LENGTH)) { index ->
                 Box(
                     modifier = Modifier.size(48.dp),
                     contentAlignment = Alignment.Center
@@ -50,29 +59,10 @@ fun PinInputView(
             }
         }
 
-        // Hidden text field for input
-        TextField(
-            value = pin,
-            onValueChange = { newPin ->
-                if (newPin.length <= AppConstants.MAX_PIN_LENGTH && newPin.all { it.isDigit() }) {
-                    pin = newPin
-                    onPinChange(newPin)
-
-                    // Auto-submit when minimum length reached
-                    if (newPin.length >= AppConstants.MIN_PIN_LENGTH) {
-                        onPinComplete(newPin)
-                        pin = "" // Clear for next attempt
-                    }
-                }
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            visualTransformation = PasswordVisualTransformation(),
-            singleLine = true,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
-            ),
-            modifier = Modifier.width(0.dp).height(0.dp) // Hidden but functional
+        Text(
+            text = "${pin.length}/${AppConstants.MAX_PIN_LENGTH} digits",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         // Number pad
@@ -82,11 +72,6 @@ fun PinInputView(
                     val newPin = pin + number
                     pin = newPin
                     onPinChange(newPin)
-
-                    if (newPin.length >= AppConstants.MIN_PIN_LENGTH && newPin.length <= AppConstants.MAX_PIN_LENGTH) {
-                        onPinComplete(newPin)
-                        pin = ""
-                    }
                 }
             },
             onDeleteClick = {
@@ -96,6 +81,19 @@ fun PinInputView(
                 }
             }
         )
+
+        // Submit button (appears after user stops typing)
+        if (showSubmitButton && pin.length >= AppConstants.MIN_PIN_LENGTH) {
+            Button(
+                onClick = {
+                    onPinComplete(pin)
+                    pin = ""
+                },
+                modifier = Modifier.fillMaxWidth(0.8f)
+            ) {
+                Text("Unlock")
+            }
+        }
     }
 }
 
@@ -107,7 +105,6 @@ private fun NumberPad(
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Rows 1-3
         listOf(
             listOf("1", "2", "3"),
             listOf("4", "5", "6"),
@@ -127,7 +124,6 @@ private fun NumberPad(
             }
         }
 
-        // Bottom row (0 and delete)
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {

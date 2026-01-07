@@ -66,6 +66,7 @@ private fun LockScreenContent(
     onShowBiometric: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showForgotPassword by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isUnlocked) {
         if (uiState.isUnlocked) {
@@ -124,6 +125,17 @@ private fun LockScreenContent(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
+            // Show "Forgot Password" after 3 failed attempts
+            if (uiState.attemptCount >= 3) {
+                TextButton(onClick = { showForgotPassword = true }) {
+                    Text(
+                        "Forgot Password?",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             when (uiState.authMethod) {
                 AuthMethod.PIN -> {
                     PinInputView(
@@ -169,4 +181,230 @@ private fun LockScreenContent(
             }
         }
     }
+
+    // Forgot Password Dialog with Recovery
+    if (showForgotPassword) {
+        ForgotPasswordDialog(
+            viewModel = viewModel,
+            onDismiss = { showForgotPassword = false },
+            onSuccess = onUnlocked
+        )
+    }
+}
+
+/**
+ * Forgot Password Dialog
+ * Shows recovery flow: Security Question -> Recovery PIN -> Reset Password
+ */
+@Composable
+private fun ForgotPasswordDialog(
+    viewModel: LockViewModel,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    var step by remember { mutableStateOf(1) } // 1=question, 2=recovery PIN, 3=reset
+    var userAnswer by remember { mutableStateOf("") }
+    var recoveryPinInput by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val securityQuestion = viewModel.getSecurityQuestion()
+    val hasRecovery = viewModel.hasRecoverySetup()
+    val authMethod = viewModel.getAuthMethod()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Forgot Password") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                when {
+                    !hasRecovery -> {
+                        Text(
+                            "No recovery method set up.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            "To reset:\n1. Go to Settings\n2. Apps → App Locker\n3. Clear Data",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    step == 1 && securityQuestion != null -> {
+                        Text(
+                            "Step 1: Security Question",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Text(
+                            securityQuestion,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        OutlinedTextField(
+                            value = userAnswer,
+                            onValueChange = {
+                                userAnswer = it
+                                error = null
+                            },
+                            label = { Text("Your Answer") },
+                            singleLine = true,
+                            isError = error != null,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (error != null) {
+                            Text(
+                                error!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+
+                    step == 2 -> {
+                        Text(
+                            "Step 2: Recovery PIN",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Text(
+                            "Enter your recovery PIN",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        OutlinedTextField(
+                            value = recoveryPinInput,
+                            onValueChange = {
+                                if (it.all { char -> char.isDigit() } && it.length <= 8) {
+                                    recoveryPinInput = it
+                                    error = null
+                                }
+                            },
+                            label = { Text("Recovery PIN") },
+                            singleLine = true,
+                            isError = error != null,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (error != null) {
+                            Text(
+                                error!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+
+                    step == 3 -> {
+                        Text(
+                            "Step 3: Set New Password",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Text(
+                            "Enter your new ${authMethod.name}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        OutlinedTextField(
+                            value = newPassword,
+                            onValueChange = {
+                                if (authMethod == AuthMethod.PIN) {
+                                    if (it.all { char -> char.isDigit() } && it.length <= 8) {
+                                        newPassword = it
+                                        error = null
+                                    }
+                                } else {
+                                    newPassword = it
+                                    error = null
+                                }
+                            },
+                            label = { Text("New ${authMethod.name}") },
+                            singleLine = true,
+                            isError = error != null,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (error != null) {
+                            Text(
+                                error!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (hasRecovery) {
+                when (step) {
+                    1 -> {
+                        Button(
+                            onClick = {
+                                val isCorrect = viewModel.verifySecurityAnswer(userAnswer)
+                                if (isCorrect) {
+                                    step = 2
+                                    error = null
+                                } else {
+                                    error = "Incorrect answer. Try again."
+                                }
+                            },
+                            enabled = userAnswer.isNotEmpty()
+                        ) {
+                            Text("Verify")
+                        }
+                    }
+
+                    2 -> {
+                        Button(
+                            onClick = {
+                                val isCorrect = viewModel.verifyRecoveryPin(recoveryPinInput)
+                                if (isCorrect) {
+                                    step = 3
+                                    error = null
+                                } else {
+                                    error = "Incorrect recovery PIN."
+                                }
+                            },
+                            enabled = recoveryPinInput.length >= 4
+                        ) {
+                            Text("Verify")
+                        }
+                    }
+
+                    3 -> {
+                        Button(
+                            onClick = {
+                                if (newPassword.length >= 4) {
+                                    viewModel.resetPassword(newPassword)
+                                    onSuccess()
+                                    onDismiss()
+                                } else {
+                                    error = "Password must be at least 4 characters"
+                                }
+                            },
+                            enabled = newPassword.length >= 4
+                        ) {
+                            Text("Reset Password")
+                        }
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

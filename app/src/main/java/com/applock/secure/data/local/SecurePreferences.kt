@@ -10,11 +10,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Secure preferences manager using EncryptedSharedPreferences
- * All sensitive data (PIN, Pattern) is encrypted at rest
- * Uses Android Keystore for encryption keys
- */
 @Singleton
 class SecurePreferences @Inject constructor(
     @ApplicationContext private val context: Context
@@ -32,7 +27,7 @@ class SecurePreferences @Inject constructor(
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    // First time launch
+    // First time
     fun isFirstTime(): Boolean = prefs.getBoolean(AppConstants.KEY_FIRST_TIME, true)
     fun setFirstTime(isFirst: Boolean) = prefs.edit().putBoolean(AppConstants.KEY_FIRST_TIME, isFirst).apply()
 
@@ -58,7 +53,15 @@ class SecurePreferences @Inject constructor(
     fun getRecoveryPinHash(): String? = prefs.getString(AppConstants.KEY_RECOVERY_PIN_HASH, null)
     fun setRecoveryPinHash(hash: String) = prefs.edit().putString(AppConstants.KEY_RECOVERY_PIN_HASH, hash).apply()
 
-    // Biometric enabled
+    // Security Question
+    fun getSecurityQuestion(): String? = prefs.getString("security_question", null)
+    fun setSecurityQuestion(question: String) = prefs.edit().putString("security_question", question).apply()
+
+    // Security Answer Hash
+    fun getSecurityAnswerHash(): String? = prefs.getString("security_answer_hash", null)
+    fun setSecurityAnswerHash(hash: String) = prefs.edit().putString("security_answer_hash", hash).apply()
+
+    // Biometric
     fun isBiometricEnabled(): Boolean = prefs.getBoolean(AppConstants.KEY_BIOMETRIC_ENABLED, false)
     fun setBiometricEnabled(enabled: Boolean) = prefs.edit().putBoolean(AppConstants.KEY_BIOMETRIC_ENABLED, enabled).apply()
 
